@@ -1,0 +1,182 @@
+#!/bin/sh
+
+ERL_LIBS="$ERL_LIBS${ERL_LIBS+:}%libsdir%"
+
+NAME="peerdrive-$USER"
+CONFIG="$HOME/.peerdrive/etc/peerdrive"
+RUN_DIR="/tmp/peerdrive-${USER}"
+SYSFLAG=
+
+ERLDAEMON=$(ls -1 "%libsdir%"/erldaemon-*/priv/erldaemon | tail -n1)
+
+get_pid() {
+	if test -f $PID_FILE; then
+		PID=`cat $PID_FILE`
+	fi
+	echo $PID
+}
+
+# Check if running. Returns:
+#   0 - PeerDrive is running
+#   1 - Not running
+#   2 - Not running + stale pid file
+is_running() {
+    PID=`get_pid`
+    if [ -n "$PID" ]; then
+        if kill -0 $PID 2> /dev/null; then
+            return 0
+        else
+			return 2
+        fi
+    fi
+
+    return 1
+}
+
+print_status() {
+	echo -n "PeerDrive is "
+	case "$1" in
+		0)
+			echo "running"
+			;;
+		1)
+			echo "not running"
+			;;
+		2)
+			echo "not running (stale pid file)"
+			;;
+	esac
+}
+
+start_daemon() {
+	if [ -r "${CONFIG}.config" ]; then
+		CONFIG="-config $CONFIG"
+	else
+		CONFIG=
+	fi
+
+	if [ "$LOG_ROTATE" -a -w "$LOG_FILE" ]; then
+		mv "$LOG_FILE" "${LOG_FILE}.old"
+	fi
+
+	mkdir -m 750 -p "$RUN_DIR"
+
+	export ERL_LIBS
+	exec $ERLDAEMON $FOREGROUND -n "$NAME" -l "$LOG_FILE" -p "$PID_FILE" -- \
+		erl $CONFIG $SYSFLAG -noinput +Bd +K true -A 5 +W w \
+		-boot start_sasl -s crypto -s ssl -s peerdrive start permanent -s erldaemon
+}
+
+kill_daemon() {
+    PID=`get_pid`
+	TIMEOUT=30
+
+    if [ -n "$PID" ] && kill $PID 2>/dev/null; then
+		if kill -TERM $PID 2>/dev/null; then
+			while kill -0 $PID 2>/dev/null; do
+				if [ $TIMEOUT -le 0 ]; then
+					echo "Timeout waiting for shutdown" >&2
+					return 1
+				else
+					TIMEOUT=$(($TIMEOUT-1))
+					sleep 1
+				fi
+			done
+			return 0
+		else
+			echo "Cannot shutdown PeerDrive" >&2
+			return 1
+		fi
+	else
+		echo "PeerDrive is not running" >&2
+    fi
+
+	return 1
+}
+
+fail_if_running() {
+	if is_running; then
+		echo "PeerDrive is already running!" >&2
+		exit 1
+	fi
+}
+
+usage() {
+	echo "Usage: `basename $0` [--start|--daemon|--stop|--check|-h] [--system]"
+	echo
+	echo "Mode:"
+	echo "  --start          Start PeerDrive as daemon if it is not running yet"
+	echo "  --daemon         Run as daemon in background"
+	echo "  --stop           Shut down daemon"
+	echo "  --check          Check if daemon is running"
+	echo "  --help | -h      Show this help"
+	echo
+	echo "Options:"
+	echo "  --system          Run as system-wide instance instead of per-user"
+}
+
+
+OPERATION=foreground
+LOG_ROTATE=1
+until [ -z "$1" ]; do
+	case "$1" in
+		--start)
+			OPERATION=start
+			;;
+		--daemon)
+			OPERATION=daemon
+			;;
+		--stop)
+			OPERATION=stop
+			;;
+		--check)
+			OPERATION=check
+			;;
+		--system)
+			NAME=peerdrive
+			CONFIG="%etcdir%/peerdrive"
+			RUN_DIR="%rundir%"
+			LOG_ROTATE=
+			SYSFLAG="-system %rundir%"
+			;;
+		-h|--help)
+			usage
+			exit 0
+			;;
+		*)
+			echo "Unknown option: $1" >&2
+			usage >&2
+			exit 1
+			;;
+	esac
+	shift
+done
+
+PID_FILE="${RUN_DIR}/peerdrive.pid"
+LOG_FILE="${RUN_DIR}/console.log"
+
+case $OPERATION in
+	foreground)
+		fail_if_running
+		FOREGROUND=-f
+		start_daemon
+		;;
+	start)
+		is_running && exit 0
+		start_daemon
+		;;
+	daemon)
+		fail_if_running
+		start_daemon
+		;;
+	stop)
+		kill_daemon
+		;;
+	check)
+		is_running
+		RESULT=$?
+		print_status $RESULT >&2
+		exit $RESULT
+		;;
+esac
+

@@ -1,0 +1,174 @@
+
+In PeerDrive the documents are stored in so called "stores". Each document is
+uniquely identified by a random number (DId, usually 128 bit), where the
+document/DId can simultaneously live in more than one store. Each store
+maintains a mapping of DIds to the latest revision of the document (plus zero
+or more preliminary revisions). The actual content is stored in revisions and
+each revision is identified by the hash of its content called RId.
+
+At the basic level each revision consists of the following:
+
+	- a set of flags
+		- sticky flag
+		- ephemeral flag
+		- possibly other flags in the future
+	- structured data (see below)
+	- one or more binary attachments, each identified by a string and with
+	  separate creation/modification time
+	- a type code, specifying the format of the document (encoded as a Uniform
+	  Type Identifier [UTI])
+	- a creator code, denoting the application which created the revision
+	  (encoded as a reverse-DNS string)
+	- the creation time (microseconds since epoch, UTC)
+	- the modification time (microseconds since epoch, UTC)
+	- an optional user comment describing the revision,
+	- a list of it's preceding revision(s) (parents)
+
+This basic level is sufficient to store and retrieve schema-less, structured
+and arbitrary binary data, preserve the history of changes to a document and
+also replicate and synchronize documents between multiple stores. It also
+stores all necessary information to link to other documents/revisions in the
+structured data part.
+
+
+PeerDrive Structured Data (PDSD)
+================================
+
+The structured data of a revision has a defined semantics and binary
+representation. The data is self describing so that no additional schema is
+necessary to retrieve the stored structure. The binary representation is used
+both as exchange format and to compute the hash tree sum.
+
+Semantics
+---------
+
+PeerDrive can represent the following data types:
+	- Number
+		- Integer: 8..64 bits, signed/unsigned
+		- Floating point: float/double
+	- String: Unicode, Utf-8
+	- Boolean
+	- Link
+		- Document link
+		- Revision link
+	- List: ordered sequence of values (any PeerDrive data type)
+	- Dictionary: unordered sequence of key value pairs where
+		- the key is a string,
+		- and the value is of any PeerDrive data type
+
+Binary representation
+---------------------
+
+All data stored as little endian. The following is no strict EBNF but you
+should get the idea...
+
+PDSD = value
+
+value = dict | list | string | bool | link | real | int
+
+link = doc_link | rev_link
+
+real = float | double
+
+int = uint8, sint8, unit16, sint16, uint32, sint32, uint64, sint64
+
+dict = 0x00, NoOfElements:32/little, { string, value }
+
+list = 0x10, NoOfElements:32/little, { value }
+
+string = 0x20, StringLength:32/little, ?UTF-8 encoded string?
+
+bool = 0x30, (0x00 | 0x01)
+
+rev_link = 0x40, Length:8, Rev
+doc_link = 0x41, Length:8, Doc
+
+float  = 0x50, ?32 bit IEEE float?
+double = 0x51, ?64 bit IEEE double?
+
+uint8  = 0x60, ?unsigned char?
+sint8  = 0x61, ?signed char?
+uint16 = 0x62, ?unsigned short?
+sint16 = 0x63, ?signed short?
+uint32 = 0x64, ?unsigned long?
+sint32 = 0x65, ?signed long?
+uint64 = 0x66, ?unsigned long long?
+sint64 = 0x67, ?signed long long?
+
+
+Document linking
+================
+
+Each document is treated completely independent of any other document. For
+navigational access there can be directed links between them. As entry point to
+the link chain there is a root document in each store, just like the root
+directory in file systems.
+
+There are two types of links in PeerDrive:
+
+	- Document link: points to a document
+	- Revision link: points to a revision
+
+In essence PeerDrive links are like symbolic links in the meaning that they
+symbolically refer to another document/revision. But they are also like hard
+links in the sense that they are independent of the target's location, even
+across stores.
+
+
+Garbage collection
+==================
+
+Even though documents and revisions can be deleted explicitly they are normally
+garbage collected implicitly. When there is no path from the root document of a
+store to a certain document/revision then it is eligible for garbage
+collection. The path is formed by links in the revision meta data (Doc- and
+Rev-links) and the parent pointers of each revision.
+
+This garbage collection scheme will keep documents alive as long as there is
+any revision pointing to the document, even if none of them is current revision
+of a document. In other words it would still be possible to open or update a
+document which is not reachable by any current document revision. Stores should
+prevent updates to such documents for a consistent user experience.
+
+There is only one exception to the garbage collection rules above: newly
+created documents. It is guaranteed that new documents are exempted from
+garbage collection as long as the handle which committed the initial version is
+kept open.
+
+The rationale behind this exception is that new documents cannot be linked
+before they are committed for the first time, simply because they don't exist
+yet. This makes it impossible to satisfy the reachability criterion of the
+garbage collector. By keeping the document handle open the creating application
+can safely add a document link to the new document after committing the initial
+version.
+
+
+Binary object representation
+============================
+
+To compute the hash of a revision a common binary representation is needed.
+All values are encoded as little endian...
+
+uint32                .. Flags (0: Sticky, 1..31: Reserved [0])
+uint8, uint8[]        .. Hash tree sum of structured data (length and sum, see PDSD)
+uint32                .. Number of binary attachments
+	uint32, char[]    .. Attachment name (length and string, UTF-8)
+	uint8, uint8[]    .. hash tree sum of attachment content (length and sum)
+uint32                .. Number of parents
+	uint8, uint8[]    .. Parent object id (length and id)
+uint64                .. Mtime (UTC unix time in nanosecons)
+uint32, char[]        .. Type code (length and string, UTF-8)
+uint32, char[]        .. Creator code (length and string, UTF-8)
+uint32, char[]        .. Comment (length and string, UTF-8)
+
+The SHA1 hash sums of the parts are computed as binary hash tree with a block
+size of 4096 bytes. This ensures that the new hash sum can be calculated
+quickly if only small areas in a very big part are changed.
+
+Each block is hashed with a 0x00 byte prepended before applying the SHA1
+function. All internal nodes of the binary hash tree prepend a 0x01 byte and
+are defined as SHA1(0x01, LeftChildSum, RightChildSum). If the number of blocks
+is not a power of two the tree will be unbalanced. In such a tree interim nodes
+that do not have a sibling are propagated upwards until a sibling is found.
+
+

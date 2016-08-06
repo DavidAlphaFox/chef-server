@@ -1,0 +1,35 @@
+POSIX file system interface to PeerDrive
+========================================
+
+- FUSE, single mount point
+- Root directory shows all stores
+- Under each store directory only the documents on that store -> per store access
+- direct access to doc/rev by virtual '.docs' resp. '.revs' directories
+
+examples:
+/sys/.revs/00112233445566778899aabbccddeeff/MyFileTitle
+/usr/foo/bar.txt
+  |   |    |
+  |   |    \-- "public.text" document
+  |   \------- "org.peerdrive.folder" document
+  \----------- store name
+
+
+Access to legacy file system from PeerDrive
+===========================================
+
+Access to regular file systems through PeerDrive APIs is not provided because
+this creates too many problems. The user should see the break instead of
+relying on unavailable or fragile features.
+
+- cannot guarantee semantics
+	- transactinal features (write/commit/close)
+	- extended meta data
+		- could be stored in hidden files
+		- would break if file is moved/edited/replaced/... in legacy app
+		- will lead to meta data loss -> real data loss in users view
+	- revision history (could only keep last revision)
+		- breaks sync/replication features
+
+- howto remember doc-id's on read only file systems?
+

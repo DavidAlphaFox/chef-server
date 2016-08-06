@@ -1,0 +1,10 @@
+{
+	application,
+	peerdrive,
+	[
+		{description, "PeerDrive server"},
+		{vsn, git},
+		{applications, [kernel, stdlib, crypto, sasl, ssl]},
+		{mod, {peerdrive_app, []}}
+	]
+}.

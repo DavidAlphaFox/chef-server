@@ -1,0 +1,53 @@
+
+%% Add FUSE or Dokan dependency based on OS type
+Config1 = case os:getenv("DISABLE_VFS") of
+	false ->
+		{erl_opts, ErlOpts} = lists:keyfind(erl_opts, 1, CONFIG),
+		{deps, Deps} = lists:keyfind(deps, 1, CONFIG),
+
+		case os:type() of
+			{unix, _} ->
+				io:format("vfs: enabled (fuserl)~n"),
+				ErlOpts2 = [{d, have_fuserl} | ErlOpts],
+				Deps2 = [
+					{
+						fuserl,
+						".*",
+						{git, "https://github.com/peerdrive/fuserl.git", {tag, "3.0.0"}}
+					} | Deps ];
+
+			{win32, _} ->
+				io:format("vfs: enabled (erldokan)~n"),
+				ErlOpts2 = [{d, have_dokan} | ErlOpts],
+				Deps2 = [
+					{
+						erldokan,
+						".*",
+						{git, "https://github.com/peerdrive/erldokan.git", {tag, "1.3.0"}}
+					} | Deps ]
+		end,
+		lists:keystore(erl_opts, 1,
+			lists:keystore(deps, 1, CONFIG, {deps, Deps2}),
+			{erl_opts, ErlOpts2});
+
+	_ ->
+		io:format("vfs: disabled~n"),
+		CONFIG
+end,
+
+%% Add ErlDaemon as dependency on UNIX systems
+case os:type() of
+	{unix, _} ->
+		{deps, ErlDDeps1} = lists:keyfind(deps, 1, Config1),
+		ErlDDeps2 = [
+			{
+				erldaemon,
+				".*",
+				{git, "https://github.com/peerdrive/erldaemon.git", {tag, "1.0.0"}}
+			} | ErlDDeps1 ],
+		lists:keystore(deps, 1, Config1, {deps, ErlDDeps2});
+
+	_ ->
+		Config1
+end.
+

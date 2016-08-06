@@ -1,0 +1,125 @@
+
+Currently there are two interfaces to the PeerDrive server: a client interface
+which is used by other applications to access documents in PeerDrive and a
+netstore interface for store access between servers.
+
+Both interfaces are realized through the same light weight RPC protocol over
+TCP, but with their own set of messages. All messages are encoded via Google
+Protocol Buffers. The generic packet definition looks like the following:
+
+Packet ::= Length::UINT16, Reference::UINT32, PacketType::Type, Body
+
+PacketType ::= Message::Message, Type::Type
+
+Type ::= UINT4
+	REQUEST     0
+	CONFIRM     1
+	INDICATION  2
+	RESPONSE    3
+
+Body ::=
+	<Protobuf Message>
+
+The Message types and protobuf messages are distinct for the client and
+netstore interfaces. For each message type there are up to four protobuf
+messages, e.g. for FOO_MSG there might be one or more of the following
+protobuf message definitions: FooReq, FooCnf, FooInd and FooRsp. The
+definitions can be found in the following locations:
+
+* Client:   server/apps/peerdrive/src/peerdrive_client.proto
+* NetStore: server/apps/peerdrive/src/peerdrive_netstore.proto
+
+Client API
+==========
+
+Message ::= UINT12
+	ERROR_MSG           0x000
+	INIT_MSG            0x001
+	ENUM_MSG            0x002
+	LOOKUP_DOC_MSG      0x003
+	LOOKUP_REV_MSG      0x004
+	STAT_MSG            0x005
+	PEEK_MSG            0x006
+	CREATE_MSG          0x007
+	FORK_MSG            0x008
+	UPDATE_MSG          0x009
+	RESUME_MSG          0x00a
+	READ_MSG            0x00b
+	TRUNC_MSG           0x00c
+	WRITE_MSG           0x00d
+	GET_FLAGS_MSG       0x00e
+	SET_FLAGS_MSG       0x00f
+	GET_TYPE_MSG        0x010
+	SET_TYPE_MSG        0x011
+	GET_PARENTS_MSG     0x012
+	MERGE_MSG           0x013
+	REBASE_MSG          0x014
+	COMMIT_MSG          0x015
+	SUSPEND_MSG         0x016
+	CLOSE_MSG           0x017
+	WATCH_ADD_MSG       0x018
+	WATCH_REM_MSG       0x019
+	WATCH_PROGRESS_MSG  0x01a
+	FORGET_MSG          0x01b
+	DELETE_DOC_MSG      0x01c
+	DELETE_REV_MSG      0x01d
+	FORWARD_DOC_MSG     0x01e
+	REPLICATE_DOC_MSG   0x01f
+	REPLICATE_REV_MSG   0x020
+	MOUNT_MSG           0x021
+	UNMOUNT_MSG         0x022
+	SYS_INFO_MSG        0x023
+	WATCH_MSG           0x024
+	PROGRESS_START_MSG  0x025
+	PROGRESS_MSG        0x026
+	PROGRESS_END_MSG    0x027
+	PROGRESS_QUERY_MSG  0x028
+
+
+Network Store API
+=================
+
+Message ::= UINT12
+	ERROR_MSG            0x000
+	INIT_MSG             0x001
+	STATFS_MSG           0x002
+	LOOKUP_MSG           0x003
+	CONTAINS_MSG         0x004
+	STAT_MSG             0x005
+	PEEK_MSG             0x006
+	CREATE_MSG           0x007
+	FORK_MSG             0x008
+	UPDATE_MSG           0x009
+	RESUME_MSG           0x00a
+	READ_MSG             0x00b
+	TRUNC_MSG            0x00c
+	WRITE_MSG            0x00d
+	GET_FLAGS_MSG        0x00e
+	SET_FLAGS_MSG        0x00f
+	GET_TYPE_MSG         0x010
+	SET_TYPE_MSG         0x011
+	GET_PARENTS_MSG      0x012
+	SET_PARENTS_MSG      0x013
+	GET_LINKS_MSG        0x014
+	SET_LINKS_MSG        0x015
+	COMMIT_MSG           0x016
+	SUSPEND_MSG          0x017
+	CLOSE_MSG            0x018
+	FORGET_MSG           0x019
+	DELETE_DOC_MSG       0x01a
+	DELETE_REV_MSG       0x01b
+	PUT_DOC_START_MSG    0x01c
+	PUT_DOC_COMMIT_MSG   0x01d
+	PUT_DOC_ABORT_MSG    0x01e
+	FF_DOC_START_MSG     0x01f
+	FF_DOC_COMMIT_MSG    0x020
+	FF_DOC_ABORT_MSG     0x021
+	PUT_REV_START_MSG    0x022
+	PUT_REV_PART_MSG     0x023
+	PUT_REV_ABORT_MSG    0x024
+	PUT_REV_COMMIT_MSG   0x025
+	SYNC_GET_CHANGES_MSG 0x026
+	SYNC_SET_ANCHOR_MSG  0x027
+	SYNC_FINISH_MSG      0x028
+	TRIGGER_MSG          0x029
+

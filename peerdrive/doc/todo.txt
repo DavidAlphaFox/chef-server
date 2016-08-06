@@ -1,0 +1,51 @@
+- Server
+	- fix sync
+		- stop sync in case of error
+		- let user pause/resume
+	- File store improvements
+		- automatically delete old revisions when disk full
+	- add search engine
+		- lucene
+		- add query API (virtual collections)
+	- network stores
+		- rev cache
+		- local sharing groups
+	- automatically detect/mount stores
+		- local stores when removable drive connected (inotify/WM_DEVICECHANGE)
+		- network stores (bonjour)
+
+- user interface
+	- Additional file types
+		- contacts
+		- audio
+		- video
+	- improve collections
+		- support email thread view
+		- indicators
+			- added (but not saved yet)
+			- needs merge
+			- may need replication
+	- possibility to cancel ongoing replication/synchronzation
+
+- Libs
+	- command line interface
+	- other language bindings
+
+- Security
+	- access control
+		- principle
+			- attached to each uuid/rev
+			- easy for file_store (reuse OS file permissions)
+			- implementation specific because access control is context dependent
+		- systems
+			- unix permissions UID/GID/mask
+			- ACL's
+	- crpyto
+		- revision signing
+			- 'SIGN' part, signature of RId without 'SIGN' part
+		- encryption
+			- transparent layer to wrap around store
+			- encrypt all revision fields and parts, except RevLinks/DocLinks
+			- store must not verify PId's and RId's in this case
+			- decryption cache in client for performance?
+

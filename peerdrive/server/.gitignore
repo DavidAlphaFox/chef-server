@@ -1,0 +1,9 @@
+/apps/peerdrive/include/peerdrive_client_pb.hrl
+/apps/peerdrive/include/peerdrive_netstore_pb.hrl
+/deps/
+/peerdrive.config
+/rel/peerdrive/
+/snapshots/
+/stores/
+/vfs/
+*.o

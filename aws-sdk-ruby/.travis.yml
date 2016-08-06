@@ -1,0 +1,35 @@
+language: ruby
+
+rvm:
+  - 1.9.3
+  - 2.0.0
+  - 2.1
+  - 2.2
+  - 2.3.0
+  - jruby
+
+sudo: false
+
+env:
+  - PURE_RUBY=1
+  - KITCHEN_SINK=1
+
+script: bundle exec rake
+
+bundler_args: --without docs release repl
+
+matrix:
+  exclude:
+    - rvm: jruby
+      env: KITCHEN_SINK=1
+  include:
+    - rvm: 2.3.0
+      env: OLD_OJ=1
+
+notifications:
+  webhooks:
+    urls:
+      - "https://webhooks.gitter.im/e/4442efd380ec811746d9"
+    on_success: change
+    on_failure: always
+    on_start: false

@@ -1,0 +1,146 @@
+
+== Introduction ==
+
+PeerDrive tries to solve various problems which are common to every day file
+management but which are poorly supported by traditional hierarchical file
+systems. In particular these are:
+
+  - Replication and synchronization
+  - Seamless backup integration
+  - File versioning
+  - Arbitrary, non-hierarchical file organization
+  - Annotation (e.g. tags) and rich meta data
+
+These problems are tackled by three main concepts in PeerDrive...
+
+=== Split identity and organization ===
+
+In traditional hierarchical file systems a file is identified by its path.
+Normally this means that if two paths differ then they identify two different
+files (excluding sym-/hard links at this point). The problem with this scheme
+is that it not only gives the file its identity but it also represents the
+users classification/organization of the file. If the user moves the file to
+another folder (to change the classification) he will also implicitly change
+the identity of the file. Usually the user observes the effect of the changed
+identity by broken symbolic links or non-working "Recent files" entries in
+applications.
+
+Even though these effects can be mitigated by good user interfaces and
+additional software layers they are not solvable on the file system level.
+Furthermore only strict categorization schemes are supported as organizing
+principle. A file can only live in one category (folder) at the same time. Hard
+links can overcome this situation but they only work for files on the same
+volume and not for directories. Symlinks work for both files and directories
+but break as soon as the original file is moved.
+
+In PeerDrive every document (file) is identified by a 128 bit random unique id
+(DId). Any document can "point" to another document by it's DId, even across
+volume boundaries. This allows for arbitrary organization schemes via
+"container" documents. The documents can be moved even between volumes (called
+'stores' in PeerDrive) without breaking the links between them.
+
+The same document (DId) may also exist on more than one store simultaneously.
+This is no error and is a common state when documents are replicated between
+different stores. In conjunction with versioning PeerDrive is later able to
+synchronize the replicas on the different stores.
+
+
+=== Document versioning ===
+
+The content of each document is stored as a series of immutable revisions as
+opposed to a mutable byte stream in traditional file systems. For this scheme
+each store maintains a mapping of document IDs to the latest revision of the
+document where each revision is identified by the hash of its content. This is
+the same scheme as git is using to track changes to the repository.
+
+As a document can exist is more than one store simultaneously it's history may
+not be linear and can contain forks. See the following "picture" for an
+illustration of what happens when a document is replicated and changed
+independently on the different stores. The numbers in parenthesis show on
+which stores the revision exists.
+
+                          D(1)---F(1)   <-- Doc (Store 1)
+                         /
+        A(12)---B(12)---C(12)
+                         \
+                          E(2)---G(2)   <-- Doc (Store 2)
+
+If the user chooses to synchronize the two versions of the same document
+PeerDrive is able to find the common ancestor (C) and merge the independent
+changes into one version automatically. After the merge the document exists on
+both stores with the same revision and the same history.
+
+                             D(12)---F(12)
+                            /             \         /- Doc (Store 1)
+        A(12)---B(12)---C(12)              H(12) <-|
+                            \             /         \- Doc (Store 2)
+                             E(12)---G(12)
+
+Another big advantage for the user is that he is always able to access previous
+revisions of the document. As long as old revisions are not purged the user
+does not need to care about overwriting the document and loosing important
+data.
+
+Additionally this allows for a seamless integration of backups. Old revisions
+which are not needed anymore may be moved to a backup store. If such an old
+revision is needed again only the backup store needs to be mounted because
+PeerDrive does not care on which store a revision is located. Therefore normal
+document handling and backup are seamlessly integrated in PeerDrive.
+
+=== Rich meta data ===
+
+In traditional file systems a file is just a stream of bytes with a limited
+amount meta data (file name, size, c-/m-/atime, access rights). Later extended
+attributes were added which are user definable key/value pairs, where keys are
+usually strings and values again streams of bytes. BeOS added indexing of these
+extended attributes and used them extensively for file management.
+
+PeerDrive takes the concept even further and allows arbitrarily complex meta
+data. This includes key/value pairs but also lists, links to other documents,
+booleans, integers, floats and strings. Semantically this is close to JSON or
+other structured data representations. This allows for unrestricted, extensible
+annotation of documents by the user or applications. Together with indexing of
+this meta data the user is able to quickly find documents based on this meta
+data.
+
+All meta data, that is including the file name, is stored with the document. In
+traditional file systems the file name is given by the directory whereas
+extended attributes are stored in the inode (the file itself). Furthermore each
+additional hardlink created a new file name. Renaming one of the hard links is
+not visible on the other hard links.
+
+== Additional concepts ==
+
+=== Uniform type identifier ===
+
+The type of a document is indicated by a Uniform Type Identifier (UTI) in
+PeerDrive.
+
+http://en.wikipedia.org/wiki/Uniform_Type_Identifier
+
+TODO
+
+=== Multi part documents ===
+
+PeerDrive documents consist of one or more parts, each identified by a FourCC.
+TODO
+
+=== Standardized structured data ===
+
+Data in the 'PDSD' part of a document has the same structure and encoding as in
+the 'META' part. TODO
+
+=== Sticky documents ===
+
+=== Preliminary revisions ===
+
+Once a new revision of a document is created it cannot be overwritten anymore.
+It can just be superseeded by another, newer revision while the old revision is still
+kept. But sometimes it is desireable to just replace a revision, though.
+
+This can be done by saving the current document state as a preliminary revision. Such
+revisions will never be replicated because they will eventually be replaced or deleted.
+There can be also be more than one preliminary revision per document.
+
+
+

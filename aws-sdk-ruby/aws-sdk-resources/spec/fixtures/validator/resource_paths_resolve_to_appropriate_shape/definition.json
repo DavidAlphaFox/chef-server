@@ -1,0 +1,24 @@
+{
+  "resources": {
+    "Thing": {
+      "hasMany": {
+        "DooDads": {
+          "request": { "operation": "ListDooDads" },
+          "resource": {
+            "type": "DooDad",
+            "identifiers": [
+              { "target":"Name", "source":"response", "path":"DooDads[].Name" }
+            ],
+            "path": "BadPath"
+          }
+        }
+      }
+    },
+    "DooDad": {
+      "identifiers": [
+        { "name": "Name" }
+      ],
+      "shape": "DooDad"
+    }
+  }
+}
