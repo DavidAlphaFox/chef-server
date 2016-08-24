@@ -52,6 +52,7 @@ to_binary(Val) when is_binary(Val) ->
 %% Return the URL decoded bucket name
 -spec get_bucket(term()) -> term().
 get_bucket(Req0) ->
+    %% 获取bucket的地址
     case wrq:path_info(bucket, Req0) of
         undefined ->
             %% We would through a bad match here but you cant have

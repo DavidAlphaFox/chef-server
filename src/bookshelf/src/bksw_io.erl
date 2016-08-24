@@ -146,16 +146,19 @@ open_for_write(Bucket, Entry) ->
                        [Bucket, Entry, FileName, Error]),
             Error
     end.
-
+%% 打开特定的Bucket进行读取
 -spec open_for_read(binary(), binary()) -> {ok, #entryref{}} | {error, term()}.
 open_for_read(Bucket, Entry) ->
+    %% 得到文件名
     FileName = bksw_io_names:entry_path(Bucket, Entry),
+    %% 打开文件
     case file:open(FileName, [read, binary, raw]) of
         {ok, Fd} ->
             ?LOG_DEBUG("open_for_read entry ~p ~p at ~p",
                        [Bucket, Entry, FileName]),
             case file:read(Fd, 2) of
                 %% Verify magic number is intact
+                %% 校验文件头
                 {ok, ?MAGIC_NUMBER} ->
                     %% Skip past checksum data for now
                     {ok, ?TOTAL_HEADER_SIZE_BYTES} = file:position(Fd, {bof, ?TOTAL_HEADER_SIZE_BYTES}),
@@ -235,6 +238,7 @@ write(#entryref{fd=Fd, ctx=Ctx,
 finish_write(#entryref{fd=Fd, path=Path, bucket=Bucket, entry=Entry, ctx=Ctx}) ->
     case file:sync(Fd) of
         ok ->
+            %% 生成校验码
             Digest = erlang:md5_final(Ctx),
             %% Seek to metadata section of file
             {ok, ?MAGIC_NUMBER_SIZE_BYTES} = file:position(Fd, {bof, ?MAGIC_NUMBER_SIZE_BYTES}),

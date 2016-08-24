@@ -57,12 +57,13 @@
 %% full copy of the request body buffered into the request process state. So we define this
 %% resource callback to blindly say the content is valid and then do the verification in the
 %% upload/2 flow.
+%% 不要让webmachine来验证自己来验证
 validate_content_checksum(Rq, Ctx) ->
     {true, Rq, Ctx}.
-
+%% 准许的方法
 allowed_methods(Rq, Ctx) ->
     {['HEAD', 'GET', 'PUT', 'DELETE'], Rq, Ctx}.
-
+%% 默认认为是octet-stream类型的
 content_types_provided(Rq, Ctx) ->
     CType =
     case wrq:get_req_header("accept", Rq) of
@@ -84,7 +85,7 @@ content_types_accepted(Rq, Ctx) ->
          end,
     {MT, _Params} = webmachine_util:media_type_to_detail(CT),
     {[{MT, upload}], Rq, Ctx}.
-
+%% 检查资源是否存在
 resource_exists(Rq0, Ctx) ->
     {ok, Bucket, Path} = bksw_util:get_object_and_bucket(Rq0),
     %% Buckets always exist for writes since we create them on the fly

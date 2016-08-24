@@ -45,12 +45,12 @@ init(_Args) ->
     MaxRestarts = 1000,
     MaxSecondsBetweenRestarts = 3600,
     SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
-
+    %% 启动webMachine
     WebmachineSup = {bksw_webmachine_sup, {bksw_webmachine_sup, start_link, []},
                      permanent, infinity, supervisor, [bksw_webmachine_sup]},
     {ok, {SupFlags, maybe_with_cleanup_task([WebmachineSup])}}.
 
-
+%% 配置清扫任务
 maybe_with_cleanup_task(ChildSpecs) ->
     CleanupTask = {bksw_cleanup_task, {bksw_cleanup_task, start_link, []},
                    permanent, brutal_kill, worker, [bksw_cleanup_task]},
@@ -62,6 +62,8 @@ maybe_with_cleanup_task(ChildSpecs) ->
     end.
 
 prepare_storage_type(filesystem) ->
+    %% 确保磁盘空间
+    %% 升级文件格式
     bksw_io:ensure_disk_store(),
     bksw_io:upgrade_disk_format();
 prepare_storage_type(sql) ->
