@@ -185,9 +185,11 @@ entry_md(Bucket, Entry) ->
 
 -spec entry_md(#entryref{}) -> {ok, #object{}} | error.
 entry_md(#entryref{fd=Fd, path=Path, bucket=Bucket, entry=Entry}) ->
+    %% 获取文件的时间戳
     case file:read_file_info(Path) of
         {ok, #file_info{mtime = Date, size = Size}} ->
             [UTC | _] = %% FIXME This is a hack until R15B
+                %% 计算出utc时间
                 calendar:local_time_to_universal_time_dst(Date),
             case file_md5(Fd) of
                 error ->
@@ -195,6 +197,7 @@ entry_md(#entryref{fd=Fd, path=Path, bucket=Bucket, entry=Entry}) ->
                                [Bucket, Entry, Path]),
                     error;
                 {ok, MD5} ->
+                    %% 计算出md5并返回结果
                     {ok, #object{path=Path,
                                  name=Entry,
                                  date=UTC,
