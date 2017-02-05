@@ -201,18 +201,23 @@ fully_read(Ref, Accum) ->
 
 write_streamed_body({Data, done}, Ref, Rq0, Ctx) ->
     {ok, Ref1} = bksw_io:write(Ref, Data),
+    %% 结束写入
     {ok, Digest} = bksw_io:finish_write(Ref1),
+    %% 文件头有md5校验值
     case get_header('Content-MD5', Rq0) of
         undefined ->
+            %% 没有校验值，根据算出的校验值生成etag
             Rq1 = bksw_req:with_etag(base64:encode(Digest), Rq0),
             {true, wrq:set_response_code(202, Rq1), Ctx};
         RawRequestMd5 ->
             RequestMd5 = base64:decode(RawRequestMd5),
             case RequestMd5 of
                 Digest ->
+                    %% 两个校验值一致，文件没问题
                     Rq1 = bksw_req:with_etag(RawRequestMd5, Rq0),
                     {true, wrq:set_response_code(202, Rq1), Ctx};
                 _ ->
+                    %% 否则文件存在问题，返回406
                     {true, wrq:set_response_code(406, Rq0), Ctx}
             end
     end;

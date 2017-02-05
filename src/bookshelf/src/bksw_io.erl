@@ -123,15 +123,21 @@ entry_delete(FullPath) ->
 
 -spec open_for_write(binary(), binary()) -> {ok, #entryref{}} | {error, term()}.
 open_for_write(Bucket, Entry) ->
+		%% 得到一个临时文件名
     FileName = bksw_io_names:write_path(Bucket, Entry),
+		%% 确保路径存在
     filelib:ensure_dir(FileName),
     case file:open(FileName, [exclusive, write, binary, raw]) of
+				%% 排它写模式打开
         {ok, Fd} ->
             ?LOG_DEBUG("open_for_write ~p ~p at ~p", [Bucket, Entry, FileName]),
             %% Magic number to guard against file corruption
             case file:write(Fd, ?MAGIC_NUMBER) of
+								%% 先写入魔数
                 ok ->
+										%% 确保魔数写入成功,指针移动
                     {ok, ?TOTAL_HEADER_SIZE_BYTES} = file:position(Fd, {bof, ?TOTAL_HEADER_SIZE_BYTES}),
+										%% 构建相应的上下文
                     {ok, #entryref{fd=Fd, path=FileName,
                                    bucket=Bucket, entry=Entry,
                                    ctx=erlang:md5_init()}};
@@ -239,17 +245,23 @@ write(#entryref{fd=Fd, ctx=Ctx,
 
 -spec finish_write(#entryref{}) -> {ok, binary()} | {error, file:posix() | badarg}.
 finish_write(#entryref{fd=Fd, path=Path, bucket=Bucket, entry=Entry, ctx=Ctx}) ->
+		%% 同步文件
     case file:sync(Fd) of
         ok ->
             %% 生成校验码
             Digest = erlang:md5_final(Ctx),
             %% Seek to metadata section of file
+						%% 文件指针移动到预定位置
             {ok, ?MAGIC_NUMBER_SIZE_BYTES} = file:position(Fd, {bof, ?MAGIC_NUMBER_SIZE_BYTES}),
+						%% 写入hash值
             file:write(Fd, Digest),
             file:close(Fd),
+						%% 生成最终目标文件
             FinalPath = bksw_io_names:entry_path(Bucket, Entry),
+						%% 确保路径
             case filelib:ensure_dir(FinalPath) of
                 ok ->
+										%% 移动文件到目标路径上
                     case file:rename(Path, FinalPath) of
                         ok ->
                             ?LOG_DEBUG("write completed ~p ~p", [Bucket, Entry]),
@@ -309,6 +321,7 @@ make_buckets(Root, BucketDirs) ->
 make_buckets(_Root, [], Buckets) ->
     lists:reverse(Buckets);
 make_buckets(Root, [BucketDir|T], Buckets) ->
+		%% 每一个目录就是一个buckets
     Buckets1 = case file:read_file_info(filename:join([Root, BucketDir])) of
                    {ok, #file_info{mtime=Date}} ->
                        [UTC | _] = %% FIXME This is a hack until R15B
@@ -325,6 +338,7 @@ make_buckets(Root, [BucketDir|T], Buckets) ->
 -spec disk_format_version() -> {version, integer()}.
 disk_format_version() ->
     Root = bksw_conf:disk_store(),
+		%% 得到版本号文件
     VersionFile = filename:join([Root, ?FORMAT_VERSION_FILE]),
     case filelib:is_file(VersionFile) of
         false ->
@@ -342,12 +356,15 @@ read_format_version({ok, Bin}) ->
     list_to_integer(Token1).
 
 ensure_disk_store() ->
+		%% 得到文件存储路径
     Root = bksw_conf:disk_store(),
+		%% 建立一个文件
     ToEnsure = filename:join([Root, "placehold"]),
     case filelib:is_dir(Root) of
         true -> ?LOG_INFO("Found disk_store at ~s", [Root]);
         false -> ?LOG_INFO("Disk store dir did not exist. creating disk_store at ~s", [Root])
     end,
+		%% 进行确保性的操作
     ok = filelib:ensure_dir(ToEnsure),
     ok.
 
@@ -371,7 +388,8 @@ upgrade_disk_format({version, X}) ->
 %% get list of buckets.
 %% for each bucket, list of entries (flat, ignore directories).
 %% within bucket, move entry to new path
-%% write version file.
+%% write version file
+%% 从版本0向高版本升级.
 upgrade_from_v0() ->
     [ upgrade_bucket(B) || #bucket{name = B} <- bucket_list() ],
     write_format_version(),
@@ -382,6 +400,7 @@ upgrade_bucket(Bucket) ->
     RawBucket = bksw_io_names:decode(Bucket),
     BucketPath = bksw_io_names:bucket_path(RawBucket),
     Entries = filelib:wildcard(bksw_util:to_string(BucketPath) ++ "/*"),
+		%% 得到所有的文件，而非目录
     FileEntries = [ F || F <- Entries,
                          filelib:is_dir(F) == false ],
     EntryCount = length(FileEntries),
@@ -394,7 +413,9 @@ upgrade_bucket(Bucket) ->
          %% entry_path wants the decoded name since it encodes.
          NewPath = bksw_io_names:entry_path(RawBucket,
                                             bksw_io_names:decode(BaseName)),
+				 %% 确保信的路径
          ok = filelib:ensure_dir(NewPath),
+				 %% 将文件移动到该路径上
          ok = file:rename(F, NewPath),
          log_progress()
      end || F <- FileEntries ].

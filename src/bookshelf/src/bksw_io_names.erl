@@ -27,7 +27,7 @@
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
-
+%% 使用http_uri进行编码
 encode(Data) when is_binary(Data) ->
     list_to_binary(encode(binary_to_list(Data)));
 encode(Data) when is_list(Data) ->
@@ -48,6 +48,8 @@ entry_path(Bucket, Entry) when Bucket =/= <<>> andalso Entry =/= <<>> ->
     iolist_to_binary(EP).
 
 entry_path_sha(Path) ->
+		%% encode后,计算sha的值
+		%% 构建一个4级别深度的目录
     EncodedPath = encode(Path),
     [D11, D12, D21, D22, D31, D32, D41, D42 | _PSHA] = sha_str(EncodedPath),
     filename:join([[D11, D12], [D21, D22], [D31, D32], [D41, D42], EncodedPath]).
